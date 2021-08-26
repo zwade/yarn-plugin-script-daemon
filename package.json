@@ -1,5 +1,5 @@
 {
-  "name": "yarn-plugin-smart-run",
+  "name": "yarn-plugin-script-daemon",
   "main": "./src/index.ts",
   "dependencies": {
     "@types/node": "^14.0.0",
@@ -16,10 +16,22 @@
     "bash": "bash"
   },
   "r": {
-    "test1": { "onExit": "wait",    "script": "sleep 1 && echo test1" },
-    "test2": { "onExit": "restart", "script": "sleep 2 && echo test2" },
-    "test3": { "onExit": "kill",    "script": "sleep 5 && echo test3" },
-    "test4": { "onExit": "wait",    "script": "sleep 10 && echo test4" },
+    "test1": {
+      "onExit": "wait",
+      "script": "sleep 1 && echo test1"
+    },
+    "test2": {
+      "onExit": "restart",
+      "script": "sleep 2 && echo test2"
+    },
+    "test3": {
+      "onExit": "kill",
+      "script": "sleep 5 && echo test3"
+    },
+    "test4": {
+      "onExit": "wait",
+      "script": "sleep 10 && echo test4"
+    },
     "test": [
       "r:test1",
       "r:test2",
@@ -27,13 +39,18 @@
       "r:test4"
     ],
     "test-kill": [
-      { "onExit": "kill", "script": "sleep 1" },
+      {
+        "onExit": "kill",
+        "script": "sleep 1"
+      },
       "sleep 5 && echo the end"
     ],
     "test1pass": "r:@yarnpkg/sdk->test1",
     "build:watch": {
       "script": "builder build plugin",
-      "watch": ["./src"],
+      "watch": [
+        "./src"
+      ],
       "onExit": "wait"
     }
   }

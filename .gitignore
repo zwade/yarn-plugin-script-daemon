@@ -2,6 +2,5 @@ node_modules
 .yarn/cache
 .yarn/sdks
 .yarn/install-state.gz
-bundles/
 .pnp.cjs
 .vscode
