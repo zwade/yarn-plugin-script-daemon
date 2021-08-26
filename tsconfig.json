@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "experimentalDecorators": true,
+    "module": "commonjs",
+    "target": "es2018",
+    "outDir": "dist",
+    "strict": true,
+    "lib": [
+      "es2018"
+    ]
+  },
+  "include": [
+    "src/**/*.ts"
+  ]
+}
