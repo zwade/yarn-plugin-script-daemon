@@ -21,7 +21,7 @@ class ExternalRunCommand extends BaseCommand {
         await project.restoreInstallState();
 
         if (workspace) {
-            const workspaces = [workspace, ...workspace.getRecursiveWorkspaceChildren()];
+            const workspaces = project.workspaces
             const manifests = workspaces.map((workspace) => workspace.manifest);
             const scripts = loadScripts(manifests);
             const stdio = {
