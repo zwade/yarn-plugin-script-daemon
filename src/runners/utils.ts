@@ -50,7 +50,7 @@ export abstract class Runner {
     public abstract _start(): ChildProcess;
 
     protected async onClose(code: number) {
-        if (code || true) {
+        if (code) {
             this.print(`Process exited with code ${code}\n`);
         }
 
