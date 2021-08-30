@@ -5,7 +5,7 @@ import { CloseBehavior, Runner } from "./utils";
 
 export class SingleRunner extends Runner {
     public _start() {
-        return spawn(this.command, this.args, { stdio: "inherit" });
+        return spawn(this.command, this.args, { stdio: "inherit", cwd: this.cwd });
     }
 }
 

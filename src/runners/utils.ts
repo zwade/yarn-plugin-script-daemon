@@ -1,9 +1,32 @@
 import { ChildProcess } from "child_process";
 import { FSWatcher } from "fs";
 import watch from "node-watch";
+import * as path from "path";
 import { ScriptSimple } from "../commandExecution";
 import { sleep } from "../utils";
 
+export const createLock = () => {
+    let _lock: Promise<void> | undefined;
+    const lock = async (): Promise<() => void> => {
+        if (_lock === undefined) {
+            let unlock: () => void;
+            _lock = new Promise((resolve) => {
+                unlock = () => {
+                    resolve();
+                    _lock = undefined;
+                }
+            });
+            return unlock!;
+        }
+
+        await _lock;
+        return lock();
+    }
+
+    const isAvailable = () => _lock === undefined;
+
+    return Object.assign(lock, { isAvailable });
+}
 
 export type CloseBehavior =
     | { kind: "restart" }
@@ -18,6 +41,8 @@ export abstract class Runner {
 
     protected watcher: FSWatcher | undefined;
     protected proc: ChildProcess | undefined;
+
+    protected processLock = createLock();
 
     constructor (
         script: ScriptSimple,
@@ -34,17 +59,26 @@ export abstract class Runner {
     }
 
     protected get command() {
-        return (
-            this.script.kind === "resolved" ? "/bin/sh" :
-            this.script.command
-        );
+        if (this.script.kind === "resolved") {
+            return "yarn"
+        } else {
+            return this.script.command;
+        }
     }
 
     protected get args() {
-        return (
-            this.script.kind === "resolved" ? ["-c", this.script.script + " " + this.additionalArgs.join(" ")] :
-            this.additionalArgs
-        )
+        if (this.script.kind === "resolved") {
+            return [
+                "_r_internal_2",
+                "--command", JSON.stringify(this.script.script),
+            ]
+        } else {
+            return this.additionalArgs;
+        }
+    }
+
+    protected get cwd() {
+        return this.script.kind === "resolved" ? this.script.workingDirectory : undefined;
     }
 
     public abstract _start(): ChildProcess;
@@ -65,20 +99,27 @@ export abstract class Runner {
 
     protected startWatching() {
         if (!this.watcher && this.script.watch.length > 0) {
-            this.watcher = watch(this.script.watch, { recursive: true }, async () => {
-                this.print("Restarting due to file change\n");
-                this.start();
+            const baseDir = this.script.kind === "resolved" ? this.script.workingDirectory : process.cwd();
+            const watching = this.script.watch.map((p) => path.join(baseDir, p));
+            this.watcher = watch(watching, { recursive: true,  }, async () => {
+                if (this.processLock.isAvailable()) {
+                    this.print("Restarting due to file change\n");
+                    this.start();
+                }
             });
         }
     }
 
     public async start() {
+        const release = await this.processLock();
+
         await this.kill();
         const proc = this._start();
         proc.on("close", this.onClose);
         this.proc = proc;
 
         this.startWatching();
+        release();
     }
 
     public async kill() {
@@ -87,8 +128,7 @@ export abstract class Runner {
 
         proc.off("close", this.onClose);
         const deathPromise = new Promise<void>((resolve) => {
-            this.print("trying to close");
-            proc.on("close", () => { resolve(); this.print("closed") })
+            proc.on("close", () => resolve())
             proc.kill("SIGINT");
         });
         (async () => {

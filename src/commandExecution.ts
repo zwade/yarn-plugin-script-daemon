@@ -7,6 +7,7 @@ import { WorkspaceScripts, Script, OnExit } from "./parseScripts";
 
 export interface ResolvedScriptSimple {
     kind: "resolved";
+    workingDirectory: string;
     watch: string[];
     onExit?: OnExit;
     script: string;
@@ -75,6 +76,7 @@ function resolveSingle (script: Script, scripts: WorkspaceScripts): ExecutableSc
             return {
                 kind: "resolved",
                 watch: script.watch ?? [],
+                workingDirectory: script.workingDirectory,
                 script: script.value,
                 onExit: script.onExit,
             };
@@ -132,7 +134,7 @@ export const resolveAndExecuteCommand = async (command: string, args: string[], 
 
     const commands = asArray
         .map((x) => ["--command", JSON.stringify(x)])
-        .reduce((acc, x) => [...acc, ...x], ["_r_internal", "--args", JSON.stringify(args)]);
+        .reduce((acc, x) => [...acc, ...x], ["_r_internal_1", "--args", JSON.stringify(args)]);
 
     scriptUtils.executePackageShellcode(
         locator,

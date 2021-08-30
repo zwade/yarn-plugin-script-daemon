@@ -1,4 +1,4 @@
-import type { Manifest } from "@yarnpkg/core";
+import type { Manifest, Workspace } from "@yarnpkg/core";
 import { M, marshal, MarshalError } from "@zensors/sheriff";
 
 export type OnExit = "wait" | "kill" | "restart";
@@ -14,7 +14,7 @@ export type ScriptDefinition =
 export type R = { [key: string]: ScriptDefinition };
 
 export type ScriptType =
-    | { kind: "shell-script", value: string }
+    | { kind: "shell-script", value: string, workingDirectory: string }
     | { kind: "script-reference", scriptName: string, packageName?: string }
     | { kind: "script-sequence", scripts: Script[] }
     ;
@@ -36,7 +36,7 @@ const MScriptDefinition = M.rec<ScriptDefinition>((self) => M.union(
     })
 ));
 
-const parseScript = (script: ScriptDefinition): Script | undefined => {
+const parseScript = (script: ScriptDefinition, workingDirectory: string): Script | undefined => {
     if (typeof script === "string" && script.slice(0, 2) === "r:") {
         let [packageName, scriptName] = script.slice(2).split("->");
 
@@ -46,17 +46,17 @@ const parseScript = (script: ScriptDefinition): Script | undefined => {
             return { kind: "script-reference", packageName, scriptName };
         }
     } else if (typeof script === "string") {
-        return { kind: "shell-script", value: script };
+        return { kind: "shell-script", value: script, workingDirectory };
     } else if (Array.isArray(script)) {
         return {
             kind: "script-sequence",
             scripts: script
-                .map(parseScript)
+                .map((s) => parseScript(s, workingDirectory))
                 .filter((x): x is Script => x !== undefined)
         };
     } else if (typeof script === "object") {
         const { watch, onExit, script: scriptDefinition } = script;
-        const nestedScript = parseScript(scriptDefinition);
+        const nestedScript = parseScript(scriptDefinition, workingDirectory);
         if (nestedScript === undefined) {
             return undefined
         }
@@ -72,14 +72,14 @@ const parseScript = (script: ScriptDefinition): Script | undefined => {
     }
 }
 
-const parseScripts = (scripts: R) => {
+const parseScripts = (scripts: R, workingDirectory: string) => {
     const results = new Map<string, Script>();
 
     for (const name of Object.keys(scripts)) {
         const script = scripts[name];
         try {
             marshal(script, MScriptDefinition, name);
-            const parsedScript = parseScript(script);
+            const parsedScript = parseScript(script, workingDirectory);
             if (parsedScript !== undefined) {
                 results.set(name, parsedScript);
             }
@@ -93,13 +93,14 @@ const parseScripts = (scripts: R) => {
     return results;
 }
 
-export const loadScripts = (manifests: Manifest[]): WorkspaceScripts => {
+export const loadScripts = (workspaces: Workspace[]): WorkspaceScripts => {
     const results = new Map<string, Map<string, Script>>();
 
-    for (const manifest of manifests) {
+    for (const workspace of workspaces) {
+        const manifest = workspace.manifest;
         const scripts = Object.assign({}, manifest.raw.scripts, manifest.raw.r) as R;
 
-        for (const [scriptName, script] of parseScripts(scripts).entries()) {
+        for (const [scriptName, script] of parseScripts(scripts, workspace.cwd).entries()) {
             if (!results.has(scriptName)) {
                 results.set(scriptName, new Map());
             }

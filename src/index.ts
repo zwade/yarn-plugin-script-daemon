@@ -1,4 +1,4 @@
-import { Plugin, Configuration, Project } from '@yarnpkg/core';
+import { Plugin, Configuration, Project, scriptUtils } from '@yarnpkg/core';
 import { BaseCommand } from '@yarnpkg/cli';
 import { Option } from 'clipanion';
 import { loadScripts } from './parseScripts';
@@ -7,6 +7,13 @@ import { bulkExecute } from './runners/bulk-runner';
 import { singleExecute } from './runners/single-runner';
 
 class ExternalRunCommand extends BaseCommand {
+    /**
+     * Stage 1
+     *
+     * Resolves all of the scripts that need to be run, and spawns Stage 2 with them.
+     * It does this from within the yarn context, so stage 2 will have access to the base
+     * yarn configuration.
+     */
     public static paths = [
         [`r`],
     ];
@@ -16,29 +23,34 @@ class ExternalRunCommand extends BaseCommand {
 
     async execute() {
         const configuration = await Configuration.find(this.context.cwd, this.context.plugins);
-        const { project, workspace, locator } = await Project.find(configuration, this.context.cwd);
+        const { project, locator } = await Project.find(configuration, this.context.cwd);
 
         await project.restoreInstallState();
 
-        if (workspace) {
-            const workspaces = project.workspaces
-            const manifests = workspaces.map((workspace) => workspace.manifest);
-            const scripts = loadScripts(manifests);
-            const stdio = {
-                stdout: process.stdout,
-                stderr: process.stderr,
-                stdin: process.stdin,
-            }
+        const scripts = loadScripts(project.workspaces);
 
-            await resolveAndExecuteCommand(this.command, this.arguments, scripts, locator, project, stdio);
+        const stdio = {
+            stdout: this.context.stdout,
+            stderr: this.context.stderr,
+            stdin: this.context.stdin,
         }
+
+        await resolveAndExecuteCommand(this.command, this.arguments, scripts, locator, project, stdio);
     }
 }
 
 
-class InternalRunCommand extends BaseCommand {
+class InternalRunCommand1 extends BaseCommand {
+    /**
+     * Stage 2
+     *
+     * Takes all of the commands, and spawns them under stage 3 using child_process.
+     * Stage 2 is in charge of restarting the process if it fails, or one of it's dependencies
+     * changes.
+     */
+
     public static paths = [
-        [`_r_internal`],
+        [`_r_internal_1`],
     ];
 
     public scripts = Option.Array("--command");
@@ -58,10 +70,48 @@ class InternalRunCommand extends BaseCommand {
 }
 
 
+class InternalRunCommand2 extends BaseCommand {
+    /**
+     * Stage 3
+     *
+     * Runs the script from the working directory of the yarn workspace
+     * in which the script was defined.
+     */
+
+    public static paths = [
+        [`_r_internal_2`],
+    ];
+
+    public command = Option.String("--command");
+
+    async execute() {
+        const configuration = await Configuration.find(this.context.cwd, this.context.plugins);
+        const { project, locator } = await Project.find(configuration, this.context.cwd);
+
+        await project.restoreInstallState();
+
+        const stdio = {
+            stdout: this.context.stdout,
+            stderr: this.context.stderr,
+            stdin: this.context.stdin,
+        }
+
+        scriptUtils.executePackageShellcode(
+            locator,
+            "/bin/sh",
+            ["-c", JSON.parse(this.command ?? '""')],
+            { project, ...stdio }
+        );
+    }
+}
+
+
+
 const plugin: Plugin = {
     commands: [
         ExternalRunCommand,
-        InternalRunCommand
+        InternalRunCommand1,
+        InternalRunCommand2
     ],
 };
 

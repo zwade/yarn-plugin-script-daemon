@@ -1,11 +1,11 @@
 import { ChildProcessWithoutNullStreams, spawn } from "child_process";
 
 import { ScriptSimple, Stdio } from "../commandExecution";
-import { CloseBehavior, Runner } from "./utils";
+import { CloseBehavior, createLock, Runner } from "./utils";
 
 export class BulkRunner extends Runner {
     public _start() {
-        const proc = spawn(this.command, this.args);
+        const proc = spawn(this.command, this.args, { cwd: this.cwd });
         proc.stdout.on("data", async (data) => {
             await this.print(data.toString());
         });
@@ -19,22 +19,7 @@ export class BulkRunner extends Runner {
 }
 
 export const getWrappedStdio = (base: Stdio) => {
-    let _lock: Promise<void> | undefined;
-    const lock = async (): Promise<() => void> => {
-        if (_lock === undefined) {
-            let unlock: () => void;
-            _lock = new Promise((resolve) => {
-                unlock = () => {
-                    resolve();
-                    _lock = undefined;
-                }
-            });
-            return unlock!;
-        }
-
-        await _lock;
-        return lock();
-    }
+    const lock = createLock();
 
     return (tag: string) => async (msg: string) => {
         const unlock = await lock();
