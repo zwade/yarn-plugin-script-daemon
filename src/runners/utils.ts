@@ -2,8 +2,27 @@ import { ChildProcess } from "child_process";
 import { FSWatcher } from "fs";
 import watch from "node-watch";
 import * as path from "path";
+import * as psTree from "pstree.remy";
+
 import { ScriptSimple } from "../commandExecution";
 import { sleep } from "../utils";
+
+export const killWithSignal = async (pid: number, signal: number) => {
+    const children = await new Promise<number[]>((resolve, reject) => {
+        if (!psTree.hasPS) return resolve([]);
+
+        psTree(pid, (...args: [null, number[]] | [Error]) => {
+            if (args[0]) return reject(args[0]);
+            resolve(args[1]);
+        });
+    });
+
+    const orderedChildren = children.sort((a, b) => b - a);
+
+    for (const child of orderedChildren) {
+        process.kill(child, signal);
+    }
+}
 
 export const createLock = () => {
     let _lock: Promise<void> | undefined;
@@ -129,12 +148,12 @@ export abstract class Runner {
         proc.off("close", this.onClose);
         const deathPromise = new Promise<void>((resolve) => {
             proc.on("close", () => resolve())
-            proc.kill("SIGINT");
+            killWithSignal(proc.pid, 15 /* SIGTERM */);
         });
         (async () => {
             await sleep(2000);
             if (this.proc === proc) {
-                proc.kill("SIGKILL");
+                killWithSignal(proc.pid, 9 /* SIGKILL */);
             }
         })();
         await deathPromise;
