@@ -1,3 +1,5 @@
+console.log = () => {}; // pstree.remy can't be trusted not to print console logs -_-
+
 import { ChildProcess } from "child_process";
 import { FSWatcher } from "fs";
 import watch from "node-watch";
@@ -22,6 +24,8 @@ export const killWithSignal = async (pid: number, signal: number) => {
     for (const child of orderedChildren) {
         process.kill(child, signal);
     }
+
+    process.kill(pid, signal);
 }
 
 export const createLock = () => {
