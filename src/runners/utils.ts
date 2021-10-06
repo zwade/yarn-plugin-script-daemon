@@ -93,7 +93,7 @@ export abstract class Runner {
         if (this.script.kind === "resolved") {
             return [
                 "_r_internal_2",
-                "--command", JSON.stringify(this.script.script),
+                "--command", JSON.stringify(this.script.script + " " + this.additionalArgs.join(" ")),
             ]
         } else {
             return this.additionalArgs;
