@@ -4,10 +4,23 @@ import { ChildProcess } from "child_process";
 import { FSWatcher } from "fs";
 import watch from "node-watch";
 import * as path from "path";
-import * as psTree from "pstree.remy";
+import psTree = require("pstree.remy");
 
 import { ScriptSimple } from "../commandExecution";
 import { sleep } from "../utils";
+
+export const singleKillWithSignal = (pid: number, signal: number) => {
+    try {
+        process.kill(pid, signal);
+    } catch (e) {
+        if (e && Object.hasOwnProperty.call(e, "code") && e.code === "ESRCH") {
+            // ignore
+            return;
+        }
+
+        throw e;
+    }
+}
 
 export const killWithSignal = async (pid: number, signal: number) => {
     const children = await new Promise<number[]>((resolve, reject) => {
@@ -22,10 +35,10 @@ export const killWithSignal = async (pid: number, signal: number) => {
     const orderedChildren = children.sort((a, b) => b - a);
 
     for (const child of orderedChildren) {
-        process.kill(child, signal);
+        singleKillWithSignal(child, signal);
     }
 
-    process.kill(pid, signal);
+    singleKillWithSignal(pid, signal);
 }
 
 export const createLock = () => {
