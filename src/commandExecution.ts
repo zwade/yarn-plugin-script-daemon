@@ -1,7 +1,7 @@
 import * as internal from "stream";
 
 import type { Locator, Project } from "@yarnpkg/core";
-import * as scriptUtils from "@yarnpkg/core/lib/scriptUtils";
+import { scriptUtils } from "@yarnpkg/core";
 
 import { WorkspaceScripts, Script, OnExit } from "./parseScripts";
 
