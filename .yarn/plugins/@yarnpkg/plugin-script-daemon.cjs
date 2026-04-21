@@ -1,0 +1,1 @@
+../../../bundles/@yarnpkg/plugin-script-daemon.js

@@ -143,8 +143,8 @@ function resolveScript(
     const [workspace, ...rest] = scriptName.split("->");
     const localScriptName = rest.join("->");
 
-    const workspaceScripts = scripts.get(workspace);
-    if (!workspaceScripts) {
+    const scriptsOfName = scripts.get(localScriptName);
+    if (!scriptsOfName) {
       return {
         kind: "unresolved",
         command: scriptName,
@@ -152,7 +152,7 @@ function resolveScript(
       };
     }
 
-    const foundScript = workspaceScripts.get(localScriptName);
+    const foundScript = scriptsOfName.get(workspace);
     if (!foundScript) {
       return {
         kind: "unresolved",
